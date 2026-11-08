@@ -44,44 +44,38 @@ decryptedPayloadHex = decryptedPayload.hex()
 for i in range(0, len(decryptedPayloadHex), 2): 
     groupByByte.append(decryptedPayloadHex[i:i+2])
     
+#Some of the properties are unknown because the structures are not from official microsoft documentation, we know about the structures thanks to reverse engineers
 
+#CLEAR_SECRET Structure 
+secretSize = groupByByte[0:4] #size of SYSTEM_KEYS structure
+unk0 = groupByByte[4:8] #unknown property
+unk1 = groupByByte[8:12] #unknown property
+unk2 = groupByByte[12:16] #unknown property
 
-#Clear Secret Structure
-clearSecretSize = groupByByte[0:4] #Size of the keys blob, don't forget to interpret the size value as a little endian value when converting it to decimal representation
-clearUnk0 = groupByByte[4:8] #Unknown property
-clearUnk1 = groupByByte[8:12] #Unknown property
-clearUnk2 = groupByByte[12:16] #Unknown property
+secretSize = bytes.fromhex("".join(secretSize))
+secretSize = int.from_bytes(secretSize, byteorder="little") # Size of the SYSTEM_KEYS in little endian decimal representation. byteorder="little" interprets it as little endian. For example if your secretSize is 54000000 and you don't use byteorder="little", it will return decimal 1409286144 instead of 84  
 
-clearSecretSize = bytes.fromhex("".join(clearSecretSize))
-clearSecretSize = int.from_bytes(clearSecretSize, byteorder="little") # Size of the keys blob in little endian decimal representation. byteorder="little" interprets it as little endian. For example if your clearSecretSize is 54000000 and you don't use byteorder="little", it will return decimal 1409286144 instead of 84  
+#The range of SYSTEM_KEYS 
+keys = groupByByte[16:16 + secretSize] #all bytes that aren't within this range won't be used and can be discarded
 
+#SYSTEM_KEYS Structure
+unkType0 = keys[0:4] #unknown property
+currentKeyId = keys[4:20] #Not sure what this is
+unkType1 = keys[20:24] #unknown property
+nbKeys = keys[24:28] #Number of keys (Usually only 1 key, the first key is the LSA key)
 
-keys = groupByByte[16:16 + clearSecretSize] #all bytes that aren't within this range are discarded
+nbKeys = bytes.fromhex("".join(nbKeys))
+nbKeys = int.from_bytes(nbKeys, byteorder="little") 
 
-
-#Keys blob Structure
-keysUnkType0 = keys[0:4] #Unknown property
-keysCurrentKeyId = keys[4:20] #GUID of the current key? not sure how this would change with multiple keys though so it might be the GUID of the first key and not current key
-keysUnkType1 = keys[20:24] #unknown property
-keysNbKeys = keys[24:28]#number of keys in hexadecimal representation
-
-
-keysNbKeys = bytes.fromhex("".join(keysNbKeys))
-keysNbKeys = int.from_bytes(keysNbKeys, byteorder="little") #amount of keys in little endian decimal reprsentation
-
-
-#Key blob structure
-keyId = keys[28:44] #GUID of the first key
-keyType = keys[44:48] #Not sure what this is 
-keySize = keys[48:52] #hex size of the current key
+#SYSTEM_KEY Structure
+keyId = keys[28:44] #The GUID of the LSA key
+keyType = keys[44:48] #Not sure what this is
+keySize = keys[48:52] #Size of the LSA key
 
 keySize = bytes.fromhex("".join(keySize))
-keySize = int.from_bytes(keySize, byteorder="little") #size of the current key in little endian decimal representation
+keySize = int.from_bytes(keySize, byteorder="little") #byteorder="little" is little endian so If keysize in hex was 20000000 it's turned into 00000020 before getting converted to decimal which makes it decimal 32 instead of 536870912
 
 #LSA Encrption key
 lsaKey = "".join(keys[52:52+keySize])
 print(f"LSA Key: {lsaKey}")
-
-#The code doesn't currently handle cases with multiple encrpytion keys, I'll update the code once i come across it in an engagement because i currently don't know how the structure would look like with additional keys
-
 
